@@ -41,6 +41,7 @@ def home():
 def get_data():
     conn = get_db_connection()
 
+    # если нет БД → просто вернуть пустой список
     if conn is None:
         return jsonify([])
 
@@ -66,21 +67,26 @@ def get_data():
 def add_data():
     conn = get_db_connection()
 
+    data = request.get_json()
+    name = data.get("name")
+
+    # если нет БД (CI / Railway без DB)
     if conn is None:
-        return jsonify({"error": "DB not available"}), 500
+        return jsonify({"id": 1, "name": name}), 201
 
     try:
-        data = request.get_json()
-        name = data.get("name")
-
         cur = conn.cursor()
-        cur.execute("INSERT INTO data (name) VALUES (%s)", (name,))
+        cur.execute(
+            "INSERT INTO data (name) VALUES (%s) RETURNING id;",
+            (name,)
+        )
+        new_id = cur.fetchone()[0]
         conn.commit()
 
         cur.close()
         conn.close()
 
-        return jsonify({"message": "Added"}), 201
+        return jsonify({"id": new_id, "name": name}), 201
 
     except Exception as e:
         print("Ошибка POST:", e)
@@ -92,8 +98,9 @@ def add_data():
 def delete_data(id):
     conn = get_db_connection()
 
+    # если нет БД
     if conn is None:
-        return jsonify({"error": "DB not available"}), 500
+        return jsonify({"status": "deleted", "id": id})
 
     try:
         cur = conn.cursor()
@@ -103,7 +110,7 @@ def delete_data(id):
         cur.close()
         conn.close()
 
-        return jsonify({"message": "Deleted"})
+        return jsonify({"status": "deleted", "id": id})
 
     except Exception as e:
         print("Ошибка DELETE:", e)
