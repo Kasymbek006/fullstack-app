@@ -83,6 +83,11 @@ def delete_data(item_id):
     return jsonify({"status": "deleted", "id": item_id})
 
 
+@app.route("/")
+def home():
+    return "Backend is working 🚀"
+
+
 # -----------------------
 # RUN SERVER
 # -----------------------
@@ -91,6 +96,3 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=port)
 
 
-@app.route("/")
-def home():
-    return "Backend is working 🚀"
