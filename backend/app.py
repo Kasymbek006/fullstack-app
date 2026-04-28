@@ -6,86 +6,108 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# Лучше через переменную окружения (Railway), но есть fallback
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://myuser:mypassword@localhost/myapp"
-)
+# -----------------------
+# DATABASE URL
+# -----------------------
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 
 # -----------------------
 # DB CONNECTION
 # -----------------------
 def get_db_connection():
-    if os.getenv("CI") == "true":
-        return None  # в CI нет базы
+    try:
+        if not DATABASE_URL:
+            print("No DATABASE_URL найден")
+            return None
 
-    return psycopg2.connect(DATABASE_URL)
+        return psycopg2.connect(DATABASE_URL)
+    except Exception as e:
+        print("Ошибка подключения к БД:", e)
+        return None
+
 
 # -----------------------
+# ROUTES
+# -----------------------
+
+@app.route("/")
+def home():
+    return "Backend is working 🚀"
+
+
 # GET ALL DATA
-# -----------------------
 @app.route("/api/data", methods=["GET"])
 def get_data():
     conn = get_db_connection()
 
     if conn is None:
-        return jsonify([])  # CI просто возвращает пусто
+        return jsonify([])
 
-    cur = conn.cursor()
-    cur.execute("SELECT id, name FROM items;")
-    rows = cur.fetchall()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id, name FROM data;")
+        rows = cur.fetchall()
 
-    cur.close()
-    conn.close()
+        result = [{"id": r[0], "name": r[1]} for r in rows]
 
-    result = [{"id": r[0], "name": r[1]} for r in rows]
-    return jsonify(result)
+        cur.close()
+        conn.close()
 
-# -----------------------
+        return jsonify(result)
+
+    except Exception as e:
+        print("Ошибка GET:", e)
+        return jsonify([])
+
+
 # ADD DATA
-# -----------------------
 @app.route("/api/data", methods=["POST"])
 def add_data():
-    data = request.get_json()
-
     conn = get_db_connection()
 
     if conn is None:
-        return jsonify({"id": 1, "name": data["name"]}), 201
+        return jsonify({"error": "DB not available"}), 500
 
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO items (name) VALUES (%s) RETURNING id;",
-        (data["name"],)
-    )
-    new_id = cur.fetchone()[0]
+    try:
+        data = request.get_json()
+        name = data.get("name")
 
-    conn.commit()
-    cur.close()
-    conn.close()
+        cur = conn.cursor()
+        cur.execute("INSERT INTO data (name) VALUES (%s)", (name,))
+        conn.commit()
 
-    return jsonify({"id": new_id, "name": data["name"]}), 201
+        cur.close()
+        conn.close()
 
-# -----------------------
+        return jsonify({"message": "Added"}), 201
+
+    except Exception as e:
+        print("Ошибка POST:", e)
+        return jsonify({"error": "Failed to insert"}), 500
+
+
 # DELETE DATA
-# -----------------------
-@app.route("/api/data/<int:item_id>", methods=["DELETE"])
-def delete_data(item_id):
+@app.route("/api/data/<int:id>", methods=["DELETE"])
+def delete_data(id):
     conn = get_db_connection()
-    cur = conn.cursor()
 
-    cur.execute("DELETE FROM items WHERE id = %s;", (item_id,))
+    if conn is None:
+        return jsonify({"error": "DB not available"}), 500
 
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM data WHERE id = %s", (id,))
+        conn.commit()
 
-    return jsonify({"status": "deleted", "id": item_id})
+        cur.close()
+        conn.close()
 
+        return jsonify({"message": "Deleted"})
 
-@app.route("/")
-def home():
-    return "Backend is working 🚀"
+    except Exception as e:
+        print("Ошибка DELETE:", e)
+        return jsonify({"error": "Failed to delete"}), 500
 
 
 # -----------------------
@@ -94,5 +116,3 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-
