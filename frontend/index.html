@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fullstack App</title>
+    <style>
+        body {
+            font-family: Arial;
+            margin: 40px;
+        }
+
+        input, button {
+            padding: 8px;
+            margin: 5px;
+        }
+
+        .item {
+            padding: 8px;
+            border: 1px solid #ccc;
+            margin-top: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Fullstack App (Student Project)</h2>
+
+<p><b>Student:</b> Kasymbek Gairatbekov</p>
+<p><b>ID:</b> 123456</p>
+
+<hr>
+
+<h3>Add Item</h3>
+<input type="text" id="name" placeholder="Enter name">
+<button onclick="addItem()">Add</button>
+
+<hr>
+
+<h3>Items</h3>
+<div id="list"></div>
+
+<script>
+const API = "http://127.0.0.1:5000/api/data";
+
+// -------------------- GET --------------------
+async function loadItems() {
+    const res = await fetch(API);
+    const data = await res.json();
+
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+
+    data.forEach(item => {
+        list.innerHTML += `
+            <div class="item">
+                <span>${item.name}</span>
+                <button onclick="deleteItem(${item.id})">Delete</button>
+            </div>
+        `;
+    });
+}
+
+// -------------------- POST --------------------
+async function addItem() {
+    const name = document.getElementById("name").value;
+
+    await fetch(API, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name })
+    });
+
+    document.getElementById("name").value = "";
+    loadItems();
+}
+
+// -------------------- DELETE --------------------
+async function deleteItem(id) {
+    await fetch(`${API}/${id}`, {
+        method: "DELETE"
+    });
+
+    loadItems();
+}
+
+// init
+loadItems();
+</script>
+
+</body>
+</html>
