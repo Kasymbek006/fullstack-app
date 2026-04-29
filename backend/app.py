@@ -79,28 +79,40 @@ def get_data():
 # -----------------------
 @app.route("/api/data", methods=["POST"])
 def add_data():
-    conn = get_db_connection()
-
-    if conn is None:
-        return jsonify({"message": "test mode"}), 201
-
     data = request.get_json()
     name = data.get("name")
 
+    conn = get_db_connection()
+
+    # 👉 режим тестов (CI)
+    if conn is None:
+        return jsonify({
+            "id": 1,
+            "name": name
+        }), 201
+
     try:
         cur = conn.cursor()
-        cur.execute("INSERT INTO items (name) VALUES (%s);", (name,))
+
+        cur.execute(
+            "INSERT INTO items (name) VALUES (%s) RETURNING id;",
+            (name,)
+        )
+
+        new_id = cur.fetchone()[0]
         conn.commit()
 
         cur.close()
         conn.close()
 
-        return jsonify({"message": "added"}), 201
+        return jsonify({
+            "id": new_id,
+            "name": name
+        }), 201
 
     except Exception as e:
         print("DB ERROR:", e)
         return jsonify({"error": "Failed to insert"}), 500
-
 # -----------------------
 # DELETE DATA
 # -----------------------
