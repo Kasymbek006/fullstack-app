@@ -12,7 +12,7 @@ CORS(app)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # -----------------------
-# INIT DB (создание таблицы)
+# INIT DB
 # -----------------------
 def init_db():
     if not DATABASE_URL:
@@ -37,7 +37,6 @@ def init_db():
 # DB CONNECTION
 # -----------------------
 def get_db_connection():
-    # Для CI (тестов)
     if os.getenv("CI") == "true":
         return None
 
@@ -51,7 +50,18 @@ def get_db_connection():
 # -----------------------
 @app.route("/")
 def home():
-    return "Backend is working 🚀"
+    return jsonify({
+        "message": "Backend is working 🚀"
+    })
+
+# -----------------------
+# HEALTH CHECK
+# -----------------------
+@app.route("/api/health")
+def health():
+    return jsonify({
+        "status": "healthy"
+    })
 
 # -----------------------
 # GET DATA
@@ -65,9 +75,16 @@ def get_data():
 
     cur = conn.cursor()
     cur.execute("SELECT id, name FROM items;")
+
     rows = cur.fetchall()
 
-    data = [{"id": r[0], "name": r[1]} for r in rows]
+    data = [
+        {
+            "id": r[0],
+            "name": r[1]
+        }
+        for r in rows
+    ]
 
     cur.close()
     conn.close()
@@ -80,11 +97,17 @@ def get_data():
 @app.route("/api/data", methods=["POST"])
 def add_data():
     data = request.get_json()
+
+    if not data or "name" not in data:
+        return jsonify({
+            "error": "Name is required"
+        }), 400
+
     name = data.get("name")
 
     conn = get_db_connection()
 
-    # 👉 режим тестов (CI)
+    # TEST MODE
     if conn is None:
         return jsonify({
             "id": 1,
@@ -100,6 +123,7 @@ def add_data():
         )
 
         new_id = cur.fetchone()[0]
+
         conn.commit()
 
         cur.close()
@@ -112,7 +136,11 @@ def add_data():
 
     except Exception as e:
         print("DB ERROR:", e)
-        return jsonify({"error": "Failed to insert"}), 500
+
+        return jsonify({
+            "error": "Failed to insert"
+        }), 500
+
 # -----------------------
 # DELETE DATA
 # -----------------------
@@ -121,22 +149,35 @@ def delete_data(id):
     conn = get_db_connection()
 
     if conn is None:
-        return jsonify({"message": "test mode"})
+        return jsonify({
+            "message": "test mode"
+        })
 
     cur = conn.cursor()
-    cur.execute("DELETE FROM items WHERE id = %s;", (id,))
+
+    cur.execute(
+        "DELETE FROM items WHERE id = %s;",
+        (id,)
+    )
+
     conn.commit()
 
     cur.close()
     conn.close()
 
-    return jsonify({"message": "deleted"})
+    return jsonify({
+        "message": "deleted"
+    })
 
 # -----------------------
 # RUN SERVER
 # -----------------------
 if __name__ == "__main__":
-    init_db()  # ← создаёт таблицу автоматически
+    init_db()
 
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
